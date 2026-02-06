@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { 
   LayoutDashboard, 
   Clock, 
@@ -8,11 +8,13 @@ import {
   Users, 
   BarChart3,
   Settings,
-  LogOut
+  LogOut,
+  Wallet
 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 import { UserRole } from "@/types/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps {
   userRole: UserRole;
@@ -41,6 +43,7 @@ const menuItems: Record<UserRole, { icon: React.ReactNode; label: string; path: 
     { icon: <Users size={20} />, label: "Workers", path: "/workers" },
     { icon: <Clock size={20} />, label: "Timesheets", path: "/timesheet" },
     { icon: <FileText size={20} />, label: "Payslips", path: "/payslips" },
+    { icon: <Wallet size={20} />, label: "Accounts", path: "/accounts" },
     { icon: <MessageCircle size={20} />, label: "Messages", path: "/chat" },
     { icon: <BarChart3 size={20} />, label: "Reports", path: "/reports" },
     { icon: <Settings size={20} />, label: "Settings", path: "/settings" },
@@ -50,15 +53,30 @@ const menuItems: Record<UserRole, { icon: React.ReactNode; label: string; path: 
     { icon: <BarChart3 size={20} />, label: "Analytics", path: "/analytics" },
     { icon: <Users size={20} />, label: "All Workers", path: "/workers" },
     { icon: <FileText size={20} />, label: "Payroll", path: "/payroll" },
+    { icon: <Wallet size={20} />, label: "Accounts", path: "/accounts" },
     { icon: <MessageCircle size={20} />, label: "Broadcast", path: "/broadcast" },
+    { icon: <Settings size={20} />, label: "Settings", path: "/settings" },
+  ],
+  accountant: [
+    { icon: <LayoutDashboard size={20} />, label: "Dashboard", path: "/dashboard" },
+    { icon: <Wallet size={20} />, label: "Accounts", path: "/accounts" },
+    { icon: <FileText size={20} />, label: "Payroll", path: "/payroll" },
+    { icon: <Users size={20} />, label: "Workers", path: "/workers" },
+    { icon: <BarChart3 size={20} />, label: "Reports", path: "/reports" },
     { icon: <Settings size={20} />, label: "Settings", path: "/settings" },
   ],
 };
 
 export function Sidebar({ userRole, isOpen, onClose }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
   const items = menuItems[userRole];
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
   return (
     <>
       {/* Mobile overlay */}
@@ -108,7 +126,7 @@ export function Sidebar({ userRole, isOpen, onClose }: SidebarProps) {
 
           {/* Footer */}
           <div className="p-4 border-t border-sidebar-border">
-            <button className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
+            <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
               <LogOut size={20} />
               Log Out
             </button>

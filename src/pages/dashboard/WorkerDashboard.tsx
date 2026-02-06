@@ -2,42 +2,61 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Clock, 
-  FileText, 
-  DollarSign, 
-  Calendar,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle2,
-  ArrowRight
-} from "lucide-react";
+import { Clock, FileText, DollarSign, Calendar, TrendingUp, ArrowRight, Loader2, Users, UserCheck } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTimesheets } from "@/hooks/useTimesheets";
+import { usePayslips } from "@/hooks/usePayslips";
+import { usePendingApprovals } from "@/hooks/useAccountApprovals";
 
 export default function WorkerDashboard() {
+  const { user, primaryRole } = useAuth();
+  const { data: timesheets, isLoading: loadingTimesheets } = useTimesheets();
+  const { data: payslips } = usePayslips();
+  const { data: pendingApprovals } = usePendingApprovals();
+
+  const isAdmin = ['ceo', 'manager', 'supervisor'].includes(primaryRole);
+
   const currentDate = new Date().toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
   });
+
+  // Calculate stats
+  const thisWeekHours = timesheets?.filter((t: any) => {
+    const d = new Date(t.date);
+    const now = new Date();
+    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+    return d >= weekStart && t.status === 'approved';
+  }).reduce((sum: number, t: any) => sum + Number(t.total_hours || 0), 0) || 0;
+
+  const latestPayslip = payslips?.[0];
+  const pendingCount = timesheets?.filter((t: any) => t.status === 'pending').length || 0;
+
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-bold">
-            Good Morning, John! 👋
+            {greeting()}, {user?.full_name?.split(' ')[0]}! 👋
           </h1>
           <p className="text-muted-foreground">{currentDate}</p>
         </div>
-        <Link to="/timesheet">
-          <Button className="gap-2">
-            <Clock size={18} />
-            Clock In Now
-          </Button>
-        </Link>
+        {isAdmin ? (
+          <Link to="/timesheet">
+            <Button className="gap-2"><Clock size={18} />Enter Timesheets</Button>
+          </Link>
+        ) : (
+          <Link to="/timesheet">
+            <Button className="gap-2"><Clock size={18} />View Timesheets</Button>
+          </Link>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -48,34 +67,35 @@ export default function WorkerDashboard() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">32.5</div>
-            <Progress value={81} className="mt-2" />
+            <div className="text-2xl font-bold">{thisWeekHours.toFixed(1)}</div>
+            <Progress value={(thisWeekHours / 40) * 100} className="mt-2" />
             <p className="text-xs text-muted-foreground mt-1">of 40 hours target</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
+            <CardTitle className="text-sm font-medium">Latest Pay</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">K 2,450.00</div>
-            <p className="text-xs text-success flex items-center gap-1 mt-1">
-              <TrendingUp size={12} />
-              +12% from last month
+            <div className="text-2xl font-bold">
+              K {latestPayslip ? Number(latestPayslip.net_pay).toLocaleString() : '0.00'}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {latestPayslip ? `${new Date(latestPayslip.period_start).toLocaleDateString()} period` : 'No payslips yet'}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Attendance</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Timesheets</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">96%</div>
-            <p className="text-xs text-muted-foreground mt-1">22 of 23 days this month</p>
+            <div className="text-2xl font-bold">{timesheets?.length || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">All time entries</p>
           </CardContent>
         </Card>
 
@@ -85,11 +105,32 @@ export default function WorkerDashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1</div>
-            <p className="text-xs text-muted-foreground mt-1">timesheet awaiting approval</p>
+            <div className="text-2xl font-bold">{pendingCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {isAdmin ? 'timesheets to review' : 'awaiting approval'}
+            </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Admin-specific: Pending Approvals */}
+      {isAdmin && pendingApprovals && pendingApprovals.length > 0 && (
+        <Card className="border-warning/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-warning" />
+              {pendingApprovals.length} Pending Account Approval{pendingApprovals.length > 1 ? 's' : ''}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Link to="/workers">
+              <Button variant="outline" className="gap-2">
+                Review Approvals <ArrowRight size={16} />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -97,18 +138,16 @@ export default function WorkerDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
-              Today's Timesheet
+              Timesheets
             </CardTitle>
-            <CardDescription>Submit your hours for today</CardDescription>
+            <CardDescription>
+              {isAdmin ? 'Enter and approve timesheets' : 'View your work hours'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-muted-foreground">Status</span>
-              <Badge variant="secondary">Not Started</Badge>
-            </div>
             <Link to="/timesheet">
               <Button className="w-full gap-2">
-                Start Timesheet
+                {isAdmin ? 'Manage Timesheets' : 'View Timesheets'}
                 <ArrowRight size={16} />
               </Button>
             </Link>
@@ -119,25 +158,18 @@ export default function WorkerDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              Latest Payslip
+              Payslips
             </CardTitle>
-            <CardDescription>December 2024</CardDescription>
+            <CardDescription>
+              {latestPayslip 
+                ? `Latest: K ${Number(latestPayslip.net_pay).toLocaleString()}`
+                : 'No payslips generated yet'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Net Pay</span>
-                <span className="font-medium">K 2,280.00</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Hours</span>
-                <span className="font-medium">160</span>
-              </div>
-            </div>
             <Link to="/payslips">
               <Button variant="outline" className="w-full gap-2">
-                View Payslip
-                <ArrowRight size={16} />
+                View Payslips <ArrowRight size={16} />
               </Button>
             </Link>
           </CardContent>
@@ -146,35 +178,17 @@ export default function WorkerDashboard() {
         <Card className="card-hover">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Recent Activity
+              <Users className="h-5 w-5 text-primary" />
+              Profile
             </CardTitle>
-            <CardDescription>Last 7 days</CardDescription>
+            <CardDescription>View your profile and bank details</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-success mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Timesheet Approved</p>
-                  <p className="text-xs text-muted-foreground">Jan 3, 2025</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-success mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Payslip Generated</p>
-                  <p className="text-xs text-muted-foreground">Jan 1, 2025</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Contract Review</p>
-                  <p className="text-xs text-muted-foreground">Dec 28, 2024</p>
-                </div>
-              </div>
-            </div>
+            <Link to="/profile">
+              <Button variant="outline" className="w-full gap-2">
+                My Profile <ArrowRight size={16} />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -189,19 +203,19 @@ export default function WorkerDashboard() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div>
               <p className="text-sm text-muted-foreground">Position</p>
-              <p className="font-medium">Site Engineer</p>
+              <p className="font-medium">{user?.position || '—'}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Employment Type</p>
-              <Badge>Permanent</Badge>
+              <Badge>{user?.employment_type || 'permanent'}</Badge>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Supervisor</p>
-              <p className="font-medium">Michael Chen</p>
+              <p className="text-sm text-muted-foreground">Role</p>
+              <Badge variant="outline" className="capitalize">{primaryRole}</Badge>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Hourly Rate</p>
-              <p className="font-medium">K 15.00</p>
+              <p className="font-medium">K {Number(user?.hourly_rate || 0).toFixed(2)}</p>
             </div>
           </div>
         </CardContent>
