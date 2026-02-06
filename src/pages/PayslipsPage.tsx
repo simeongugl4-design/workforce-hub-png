@@ -2,88 +2,81 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Download, Eye, Calendar, DollarSign } from "lucide-react";
-
-interface Payslip {
-  id: string;
-  period: string;
-  periodStart: string;
-  periodEnd: string;
-  hours: number;
-  rate: number;
-  gross: number;
-  deductions: number;
-  net: number;
-  status: 'generated' | 'viewed';
-}
-
-const mockPayslips: Payslip[] = [
-  { id: '1', period: 'January 2025', periodStart: '2025-01-01', periodEnd: '2025-01-15', hours: 80, rate: 15, gross: 1200, deductions: 120, net: 1080, status: 'generated' },
-  { id: '2', period: 'December 2024', periodStart: '2024-12-16', periodEnd: '2024-12-31', hours: 88, rate: 15, gross: 1320, deductions: 132, net: 1188, status: 'viewed' },
-  { id: '3', period: 'December 2024', periodStart: '2024-12-01', periodEnd: '2024-12-15', hours: 72, rate: 15, gross: 1080, deductions: 108, net: 972, status: 'viewed' },
-  { id: '4', period: 'November 2024', periodStart: '2024-11-16', periodEnd: '2024-11-30', hours: 80, rate: 15, gross: 1200, deductions: 120, net: 1080, status: 'viewed' },
-];
+import { FileText, Download, Eye, Calendar, DollarSign, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePayslips } from "@/hooks/usePayslips";
 
 export default function PayslipsPage() {
-  const latestPayslip = mockPayslips[0];
+  const { primaryRole } = useAuth();
+  const { data: payslips, isLoading } = usePayslips();
+  const isAdmin = ['ceo', 'manager', 'accountant'].includes(primaryRole);
+
+  const latestPayslip = payslips?.[0];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl md:text-3xl font-bold">Payslips</h1>
-        <p className="text-muted-foreground">Your automatically generated payslips</p>
+        <h1 className="font-display text-2xl md:text-3xl font-bold">
+          {isAdmin ? "Payroll Management" : "Payslips"}
+        </h1>
+        <p className="text-muted-foreground">
+          {isAdmin ? "All worker payslips" : "Your automatically generated payslips"}
+        </p>
       </div>
 
       {/* Latest Payslip Summary */}
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Latest Payslip
-              </CardTitle>
-              <CardDescription>{latestPayslip.period}</CardDescription>
+      {latestPayslip && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Latest Payslip
+                </CardTitle>
+                <CardDescription>
+                  {new Date(latestPayslip.period_start).toLocaleDateString()} - {new Date(latestPayslip.period_end).toLocaleDateString()}
+                </CardDescription>
+              </div>
+              <Badge className={latestPayslip.status === 'paid' ? 'bg-success' : 'bg-warning text-warning-foreground'}>
+                {latestPayslip.status === 'paid' ? 'Paid' : latestPayslip.status === 'generated' ? 'Generated' : 'Draft'}
+              </Badge>
             </div>
-            <Badge className="bg-success">New</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-5">
-            <div className="text-center p-4 rounded-lg bg-background">
-              <p className="text-sm text-muted-foreground">Hours Worked</p>
-              <p className="text-2xl font-bold">{latestPayslip.hours}</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-5">
+              <div className="text-center p-4 rounded-lg bg-background">
+                <p className="text-sm text-muted-foreground">Hours</p>
+                <p className="text-2xl font-bold">{Number(latestPayslip.total_hours).toFixed(1)}</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-background">
+                <p className="text-sm text-muted-foreground">Rate</p>
+                <p className="text-2xl font-bold">K {Number(latestPayslip.hourly_rate).toFixed(2)}</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-background">
+                <p className="text-sm text-muted-foreground">Gross</p>
+                <p className="text-2xl font-bold">K {Number(latestPayslip.gross_pay).toLocaleString()}</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-background">
+                <p className="text-sm text-muted-foreground">Deductions</p>
+                <p className="text-2xl font-bold text-destructive">K {Number(latestPayslip.deductions).toFixed(2)}</p>
+              </div>
+              <div className="text-center p-4 rounded-lg bg-primary text-primary-foreground">
+                <p className="text-sm opacity-80">Net Pay</p>
+                <p className="text-2xl font-bold">K {Number(latestPayslip.net_pay).toLocaleString()}</p>
+              </div>
             </div>
-            <div className="text-center p-4 rounded-lg bg-background">
-              <p className="text-sm text-muted-foreground">Hourly Rate</p>
-              <p className="text-2xl font-bold">K {latestPayslip.rate}</p>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-background">
-              <p className="text-sm text-muted-foreground">Gross Pay</p>
-              <p className="text-2xl font-bold">K {latestPayslip.gross.toLocaleString()}</p>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-background">
-              <p className="text-sm text-muted-foreground">Deductions</p>
-              <p className="text-2xl font-bold text-destructive">K {latestPayslip.deductions}</p>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-primary text-primary-foreground">
-              <p className="text-sm opacity-80">Net Pay</p>
-              <p className="text-2xl font-bold">K {latestPayslip.net.toLocaleString()}</p>
-            </div>
-          </div>
-
-          <div className="flex gap-4 mt-6">
-            <Button className="gap-2">
-              <Eye size={16} />
-              View Full Payslip
-            </Button>
-            <Button variant="outline" className="gap-2">
-              <Download size={16} />
-              Download PDF
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Payslip History */}
       <Card>
@@ -92,51 +85,45 @@ export default function PayslipsPage() {
             <Calendar className="h-5 w-5 text-primary" />
             Payslip History
           </CardTitle>
-          <CardDescription>All your generated payslips</CardDescription>
+          <CardDescription>All generated payslips</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  {isAdmin && <TableHead>Worker</TableHead>}
                   <TableHead>Period</TableHead>
-                  <TableHead>Date Range</TableHead>
                   <TableHead>Hours</TableHead>
                   <TableHead>Gross Pay</TableHead>
                   <TableHead>Net Pay</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockPayslips.map((payslip) => (
+                {payslips?.map((payslip: any) => (
                   <TableRow key={payslip.id}>
-                    <TableCell className="font-medium">{payslip.period}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(payslip.periodStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(payslip.periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </TableCell>
-                    <TableCell>{payslip.hours}</TableCell>
-                    <TableCell>K {payslip.gross.toLocaleString()}</TableCell>
-                    <TableCell className="font-medium">K {payslip.net.toLocaleString()}</TableCell>
+                    {isAdmin && <TableCell className="font-medium">{payslip.worker?.full_name}</TableCell>}
                     <TableCell>
-                      {payslip.status === 'generated' ? (
-                        <Badge className="bg-success">New</Badge>
-                      ) : (
-                        <Badge variant="secondary">Viewed</Badge>
-                      )}
+                      {new Date(payslip.period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(payslip.period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
-                        <Button variant="ghost" size="sm">
-                          <Eye size={16} />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Download size={16} />
-                        </Button>
-                      </div>
+                    <TableCell>{Number(payslip.total_hours).toFixed(1)}</TableCell>
+                    <TableCell>K {Number(payslip.gross_pay).toLocaleString()}</TableCell>
+                    <TableCell className="font-medium">K {Number(payslip.net_pay).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Badge className={payslip.status === 'paid' ? 'bg-success' : payslip.status === 'generated' ? 'bg-warning text-warning-foreground' : ''} variant={payslip.status === 'draft' ? 'secondary' : 'default'}>
+                        {payslip.status}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
+                {(!payslips || payslips.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                      No payslips generated yet. Payslips are auto-generated when timesheets are approved.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -153,8 +140,8 @@ export default function PayslipsPage() {
             <div>
               <h3 className="font-medium">Automatic Payslip Generation</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Your payslips are automatically generated based on your approved timesheets. 
-                You cannot edit payslips directly—all calculations are done by the system to ensure accuracy.
+                Payslips are automatically generated when timesheets are approved by supervisors.
+                Workers cannot edit payslips—all calculations are done by the system.
               </p>
             </div>
           </div>

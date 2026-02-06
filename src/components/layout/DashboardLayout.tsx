@@ -2,21 +2,16 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
-import { UserRole } from "@/types/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
-interface DashboardLayoutProps {
-  userRole: UserRole;
-  userName: string;
-  userAvatar?: string;
-}
-
-export function DashboardLayout({ userRole, userName, userAvatar }: DashboardLayoutProps) {
+export function DashboardLayout() {
+  const { user, primaryRole } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar 
-        userRole={userRole} 
+        userRole={primaryRole} 
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)} 
       />
@@ -24,9 +19,9 @@ export function DashboardLayout({ userRole, userName, userAvatar }: DashboardLay
       <div className="flex-1 flex flex-col min-w-0">
         <Header 
           onMenuClick={() => setSidebarOpen(true)}
-          userName={userName}
-          userRole={userRole}
-          userAvatar={userAvatar}
+          userName={user?.full_name || 'User'}
+          userRole={primaryRole}
+          userAvatar={user?.avatar_url || undefined}
         />
         
         <main className="flex-1 p-4 lg:p-6 overflow-auto">

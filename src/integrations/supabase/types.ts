@@ -14,16 +14,536 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      account_approvals: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          requested_role: Database["public"]["Enums"]["app_role"]
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["approval_status"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          requested_role?: Database["public"]["Enums"]["app_role"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          requested_role?: Database["public"]["Enums"]["app_role"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_approvals_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bank_details: {
+        Row: {
+          account_name: string
+          account_number: string
+          bank_name: string
+          branch: string | null
+          bsb_code: string | null
+          created_at: string
+          id: string
+          swift_code: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name?: string
+          account_number?: string
+          bank_name?: string
+          branch?: string | null
+          bsb_code?: string | null
+          created_at?: string
+          id?: string
+          swift_code?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          bank_name?: string
+          branch?: string | null
+          bsb_code?: string | null
+          created_at?: string
+          id?: string
+          swift_code?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_details_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contracts: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          daily_rate: number | null
+          description: string | null
+          end_date: string
+          hourly_rate: number | null
+          id: string
+          is_active: boolean
+          start_date: string
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          daily_rate?: number | null
+          description?: string | null
+          end_date: string
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean
+          start_date: string
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          daily_rate?: number | null
+          description?: string | null
+          end_date?: string
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financial_transactions: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          recorded_by: string
+          reference_number: string | null
+          related_payslip_id: string | null
+          related_worker_id: string | null
+          transaction_date: string
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          recorded_by: string
+          reference_number?: string | null
+          related_payslip_id?: string | null
+          related_worker_id?: string | null
+          transaction_date?: string
+          transaction_type: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          recorded_by?: string
+          reference_number?: string | null
+          related_payslip_id?: string | null
+          related_worker_id?: string | null
+          transaction_date?: string
+          transaction_type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_transactions_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_related_payslip_id_fkey"
+            columns: ["related_payslip_id"]
+            isOneToOne: false
+            referencedRelation: "payslips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_related_worker_id_fkey"
+            columns: ["related_worker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          broadcast_to_role: Database["public"]["Enums"]["app_role"] | null
+          content: string
+          created_at: string
+          id: string
+          is_broadcast: boolean
+          is_system_message: boolean
+          read_at: string | null
+          receiver_id: string | null
+          sender_id: string
+        }
+        Insert: {
+          broadcast_to_role?: Database["public"]["Enums"]["app_role"] | null
+          content: string
+          created_at?: string
+          id?: string
+          is_broadcast?: boolean
+          is_system_message?: boolean
+          read_at?: string | null
+          receiver_id?: string | null
+          sender_id: string
+        }
+        Update: {
+          broadcast_to_role?: Database["public"]["Enums"]["app_role"] | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_broadcast?: boolean
+          is_system_message?: boolean
+          read_at?: string | null
+          receiver_id?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payslips: {
+        Row: {
+          created_at: string
+          deductions: number
+          generated_by: string | null
+          gross_pay: number
+          hourly_rate: number
+          id: string
+          net_pay: number
+          notes: string | null
+          paid_at: string | null
+          paid_by: string | null
+          period_end: string
+          period_start: string
+          status: Database["public"]["Enums"]["payslip_status"]
+          total_hours: number
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          created_at?: string
+          deductions?: number
+          generated_by?: string | null
+          gross_pay?: number
+          hourly_rate?: number
+          id?: string
+          net_pay?: number
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          period_end: string
+          period_start: string
+          status?: Database["public"]["Enums"]["payslip_status"]
+          total_hours?: number
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          created_at?: string
+          deductions?: number
+          generated_by?: string | null
+          gross_pay?: number
+          hourly_rate?: number
+          id?: string
+          net_pay?: number
+          notes?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          period_end?: string
+          period_start?: string
+          status?: Database["public"]["Enums"]["payslip_status"]
+          total_hours?: number
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payslips_generated_by_fkey"
+            columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payslips_paid_by_fkey"
+            columns: ["paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payslips_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          account_status: Database["public"]["Enums"]["approval_status"]
+          avatar_url: string | null
+          created_at: string
+          department: string | null
+          email: string | null
+          employment_type: Database["public"]["Enums"]["employment_type"]
+          full_name: string
+          hourly_rate: number | null
+          id: string
+          is_active: boolean
+          location: string | null
+          phone: string | null
+          position: string | null
+          supervisor_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_status?: Database["public"]["Enums"]["approval_status"]
+          avatar_url?: string | null
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          employment_type?: Database["public"]["Enums"]["employment_type"]
+          full_name: string
+          hourly_rate?: number | null
+          id: string
+          is_active?: boolean
+          location?: string | null
+          phone?: string | null
+          position?: string | null
+          supervisor_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_status?: Database["public"]["Enums"]["approval_status"]
+          avatar_url?: string | null
+          created_at?: string
+          department?: string | null
+          email?: string | null
+          employment_type?: Database["public"]["Enums"]["employment_type"]
+          full_name?: string
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          phone?: string | null
+          position?: string | null
+          supervisor_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      timesheets: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          clock_in: string
+          clock_out: string
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["timesheet_status"]
+          supervisor_id: string
+          task_description: string | null
+          total_hours: number | null
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          clock_in: string
+          clock_out: string
+          created_at?: string
+          date: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"]
+          supervisor_id: string
+          task_description?: string | null
+          total_hours?: number | null
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          clock_in?: string
+          clock_out?: string
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["timesheet_status"]
+          supervisor_id?: string
+          task_description?: string | null
+          total_hours?: number | null
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timesheets_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timesheets_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timesheets_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_supervisor_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_accountant: { Args: { _user_id: string }; Returns: boolean }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_supervisor_of: {
+        Args: { _supervisor_id: string; _worker_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "ceo" | "manager" | "supervisor" | "worker" | "accountant"
+      approval_status: "pending" | "approved" | "rejected"
+      employment_type: "permanent" | "temporary"
+      payslip_status: "draft" | "generated" | "paid"
+      timesheet_status: "pending" | "approved" | "flagged" | "rejected"
+      transaction_type:
+        | "payroll"
+        | "expense"
+        | "reimbursement"
+        | "bonus"
+        | "deduction"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +670,19 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["ceo", "manager", "supervisor", "worker", "accountant"],
+      approval_status: ["pending", "approved", "rejected"],
+      employment_type: ["permanent", "temporary"],
+      payslip_status: ["draft", "generated", "paid"],
+      timesheet_status: ["pending", "approved", "flagged", "rejected"],
+      transaction_type: [
+        "payroll",
+        "expense",
+        "reimbursement",
+        "bonus",
+        "deduction",
+      ],
+    },
   },
 } as const
