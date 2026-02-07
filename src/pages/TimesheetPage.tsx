@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, Calendar, Send, CheckCircle2, AlertCircle, XCircle, Loader2 } from "lucide-react";
+import { Clock, Calendar, Send, CheckCircle2, AlertCircle, XCircle, Loader2, Filter } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTimesheets, useCreateTimesheet, useUpdateTimesheetStatus } from "@/hooks/useTimesheets";
 import { useAllProfiles } from "@/hooks/useProfile";
@@ -33,28 +33,31 @@ export default function TimesheetPage() {
   const { toast } = useToast();
   const isSupervisorOrAbove = ['supervisor', 'manager', 'ceo'].includes(primaryRole);
 
-  // For supervisors: select a worker to enter time for
   const [selectedWorkerId, setSelectedWorkerId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [clockIn, setClockIn] = useState('');
   const [clockOut, setClockOut] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const { data: timesheets, isLoading: loadingTimesheets } = useTimesheets();
   const { data: allProfiles } = useAllProfiles();
   const createTimesheet = useCreateTimesheet();
   const updateStatus = useUpdateTimesheetStatus();
 
-  // Get workers assigned to this supervisor
-  const assignedWorkers = allProfiles?.filter(p => 
-    isSupervisorOrAbove ? p.supervisor_id === user?.id || primaryRole === 'manager' || primaryRole === 'ceo' : false
-  ) || [];
+  // Get workers: for supervisors show their assigned workers + all if manager/ceo
+  const assignedWorkers = allProfiles?.filter(p => {
+    if (primaryRole === 'manager' || primaryRole === 'ceo') return p.id !== user?.id;
+    if (primaryRole === 'supervisor') return p.supervisor_id === user?.id;
+    return false;
+  }) || [];
 
   const calculateHours = () => {
     if (!clockIn || !clockOut) return 0;
     const [inH, inM] = clockIn.split(':').map(Number);
     const [outH, outM] = clockOut.split(':').map(Number);
-    return ((outH * 60 + outM) - (inH * 60 + inM)) / 60;
+    const diff = ((outH * 60 + outM) - (inH * 60 + inM)) / 60;
+    return diff > 0 ? diff : 0;
   };
 
   const hours = calculateHours();
@@ -66,6 +69,11 @@ export default function TimesheetPage() {
     const workerId = isSupervisorOrAbove ? selectedWorkerId : user.id;
     if (!workerId) {
       toast({ title: "Please select a worker", variant: "destructive" });
+      return;
+    }
+
+    if (hours <= 0) {
+      toast({ title: "Clock out must be after clock in", variant: "destructive" });
       return;
     }
 
@@ -97,14 +105,36 @@ export default function TimesheetPage() {
     }
   };
 
+  const filteredTimesheets = timesheets?.filter((t: any) => {
+    if (statusFilter === 'all') return true;
+    return t.status === statusFilter;
+  }) || [];
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl md:text-3xl font-bold">Timesheets</h1>
         <p className="text-muted-foreground">
-          {isSupervisorOrAbove ? "Enter and manage worker timesheets" : "View your work hours"}
+          {isSupervisorOrAbove ? "Enter clock-in/out times for workers and approve timesheets" : "View your work hours entered by your supervisor"}
         </p>
       </div>
+
+      {/* Info Banner for Workers */}
+      {!isSupervisorOrAbove && (
+        <Card className="bg-muted/50 border-primary/20">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-primary mt-0.5" />
+              <div>
+                <p className="font-medium">Your timesheets are managed by your supervisor</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your supervisor enters your clock-in and clock-out times. Once approved, your payslip is automatically generated.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Entry Form - only for supervisors+ */}
@@ -113,9 +143,9 @@ export default function TimesheetPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-primary" />
-                New Entry
+                Enter Time
               </CardTitle>
-              <CardDescription>Enter timesheet for a worker</CardDescription>
+              <CardDescription>Record clock-in/out for a worker</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -124,9 +154,15 @@ export default function TimesheetPage() {
                   <Select value={selectedWorkerId} onValueChange={setSelectedWorkerId}>
                     <SelectTrigger><SelectValue placeholder="Select worker" /></SelectTrigger>
                     <SelectContent>
-                      {assignedWorkers.map(w => (
-                        <SelectItem key={w.id} value={w.id}>{w.full_name} - {w.position}</SelectItem>
-                      ))}
+                      {assignedWorkers.length === 0 ? (
+                        <SelectItem value="none" disabled>No workers assigned</SelectItem>
+                      ) : (
+                        assignedWorkers.map(w => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.full_name} {w.position ? `- ${w.position}` : ''}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -156,10 +192,15 @@ export default function TimesheetPage() {
 
                 <div className="space-y-2">
                   <Label>Task Description</Label>
-                  <Textarea placeholder="What did the worker do?" value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} />
+                  <Textarea
+                    placeholder="What did the worker do today?"
+                    value={taskDescription}
+                    onChange={(e) => setTaskDescription(e.target.value)}
+                    rows={3}
+                  />
                 </div>
 
-                <Button type="submit" className="w-full gap-2" disabled={createTimesheet.isPending}>
+                <Button type="submit" className="w-full gap-2" disabled={createTimesheet.isPending || !selectedWorkerId}>
                   {createTimesheet.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send size={16} />}
                   Submit Timesheet
                 </Button>
@@ -168,16 +209,33 @@ export default function TimesheetPage() {
           </Card>
         )}
 
-        {/* Recent Entries */}
+        {/* Timesheets List */}
         <Card className={isSupervisorOrAbove ? "lg:col-span-2" : "lg:col-span-3"}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              {isSupervisorOrAbove ? "All Timesheets" : "My Timesheets"}
-            </CardTitle>
-            <CardDescription>
-              {isSupervisorOrAbove ? "Review and approve worker timesheets" : "Your submitted work hours"}
-            </CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  {isSupervisorOrAbove ? "All Timesheets" : "My Timesheets"}
+                </CardTitle>
+                <CardDescription>
+                  {isSupervisorOrAbove ? "Review and approve worker timesheets" : "Your submitted work hours"}
+                </CardDescription>
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <Filter size={14} className="mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="flagged">Flagged</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {loadingTimesheets ? (
@@ -200,37 +258,41 @@ export default function TimesheetPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {timesheets?.map((entry: any) => (
+                    {filteredTimesheets.map((entry: any) => (
                       <TableRow key={entry.id}>
                         {isSupervisorOrAbove && (
-                          <TableCell className="font-medium">{entry.worker?.full_name}</TableCell>
+                          <TableCell className="font-medium">{entry.worker?.full_name || '—'}</TableCell>
                         )}
                         <TableCell>
-                          {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </TableCell>
                         <TableCell>{entry.clock_in}</TableCell>
                         <TableCell>{entry.clock_out}</TableCell>
-                        <TableCell>{Number(entry.total_hours).toFixed(1)}</TableCell>
-                        <TableCell className="max-w-[150px] truncate">{entry.task_description}</TableCell>
+                        <TableCell>{Number(entry.total_hours || 0).toFixed(1)}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">{entry.task_description || '—'}</TableCell>
                         <TableCell>{getStatusBadge(entry.status)}</TableCell>
-                        {isSupervisorOrAbove && entry.status === 'pending' && (
+                        {isSupervisorOrAbove && (
                           <TableCell>
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" className="text-success" onClick={() => handleStatusUpdate(entry.id, 'approved')}>
-                                <CheckCircle2 size={16} />
-                              </Button>
-                              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleStatusUpdate(entry.id, 'rejected')}>
-                                <XCircle size={16} />
-                              </Button>
-                            </div>
+                            {entry.status === 'pending' ? (
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="ghost" className="text-success h-8 w-8 p-0" onClick={() => handleStatusUpdate(entry.id, 'approved')} title="Approve">
+                                  <CheckCircle2 size={16} />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-warning h-8 w-8 p-0" onClick={() => handleStatusUpdate(entry.id, 'flagged')} title="Flag">
+                                  <AlertCircle size={16} />
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-destructive h-8 w-8 p-0" onClick={() => handleStatusUpdate(entry.id, 'rejected')} title="Reject">
+                                  <XCircle size={16} />
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">—</span>
+                            )}
                           </TableCell>
-                        )}
-                        {isSupervisorOrAbove && entry.status !== 'pending' && (
-                          <TableCell>—</TableCell>
                         )}
                       </TableRow>
                     ))}
-                    {(!timesheets || timesheets.length === 0) && (
+                    {filteredTimesheets.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={isSupervisorOrAbove ? 8 : 6} className="text-center py-8 text-muted-foreground">
                           No timesheets found

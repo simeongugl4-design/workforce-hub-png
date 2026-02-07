@@ -1,47 +1,34 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Users, 
-  Clock, 
-  DollarSign, 
-  TrendingUp,
-  TrendingDown,
-  UserCheck,
-  AlertTriangle,
-  Calendar
-} from "lucide-react";
+import { Loader2, Users, Clock, DollarSign, TrendingUp, TrendingDown, UserCheck, AlertTriangle, Calendar } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-
-const monthlyPayroll = [
-  { month: 'Aug', amount: 125000 },
-  { month: 'Sep', amount: 132000 },
-  { month: 'Oct', amount: 128000 },
-  { month: 'Nov', amount: 145000 },
-  { month: 'Dec', amount: 152000 },
-  { month: 'Jan', amount: 148000 },
-];
-
-const attendanceData = [
-  { week: 'W1', rate: 94 },
-  { week: 'W2', rate: 96 },
-  { week: 'W3', rate: 92 },
-  { week: 'W4', rate: 98 },
-];
-
-const employmentBreakdown = [
-  { name: 'Permanent', value: 35, color: 'hsl(145, 72%, 28%)' },
-  { name: 'Temporary', value: 15, color: 'hsl(45, 93%, 47%)' },
-];
-
-const departmentHours = [
-  { dept: 'Civil', hours: 1250 },
-  { dept: 'Survey', hours: 480 },
-  { dept: 'Safety', hours: 320 },
-  { dept: 'Admin', hours: 640 },
-  { dept: 'Equipment', hours: 560 },
-];
+import { useWorkforceStats, usePayrollStats, useTimesheetStats, useContractAlerts } from "@/hooks/useAnalytics";
 
 export default function CEOAnalytics() {
+  const { data: workforce, isLoading: loadingWorkforce } = useWorkforceStats();
+  const { data: payroll, isLoading: loadingPayroll } = usePayrollStats();
+  const { data: timesheetStats, isLoading: loadingTimesheets } = useTimesheetStats();
+  const { data: contractAlerts } = useContractAlerts();
+
+  const isLoading = loadingWorkforce || loadingPayroll || loadingTimesheets;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const employmentBreakdown = [
+    { name: 'Permanent', value: workforce?.permanent || 0, color: 'hsl(145, 72%, 28%)' },
+    { name: 'Temporary', value: workforce?.temporary || 0, color: 'hsl(45, 93%, 47%)' },
+  ];
+
+  const avgAttendance = timesheetStats?.weeklyAttendance?.length
+    ? Math.round(timesheetStats.weeklyAttendance.reduce((s, w) => s + w.rate, 0) / timesheetStats.weeklyAttendance.length)
+    : 0;
+
   return (
     <div className="space-y-6">
       <div>
@@ -57,24 +44,22 @@ export default function CEOAnalytics() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">50</div>
-            <p className="text-xs text-success flex items-center gap-1">
-              <TrendingUp size={12} />
-              +4 this month
+            <div className="text-2xl font-bold">{workforce?.totalWorkforce || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {workforce?.permanent || 0} permanent, {workforce?.temporary || 0} temporary
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Payroll</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Payroll Paid</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">K 148,000</div>
-            <p className="text-xs text-destructive flex items-center gap-1">
-              <TrendingDown size={12} />
-              -2.6% from last month
+            <div className="text-2xl font-bold">K {(payroll?.totalPayrollPaid || 0).toLocaleString()}</div>
+            <p className="text-xs text-warning flex items-center gap-1">
+              K {(payroll?.pendingPayroll || 0).toLocaleString()} pending
             </p>
           </CardContent>
         </Card>
@@ -85,11 +70,8 @@ export default function CEOAnalytics() {
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">95%</div>
-            <p className="text-xs text-success flex items-center gap-1">
-              <TrendingUp size={12} />
-              +1% from last week
-            </p>
+            <div className="text-2xl font-bold">{avgAttendance}%</div>
+            <p className="text-xs text-muted-foreground">Based on recent 4 weeks</p>
           </CardContent>
         </Card>
 
@@ -99,10 +81,8 @@ export default function CEOAnalytics() {
             <AlertTriangle className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
-            <p className="text-xs text-muted-foreground">
-              Within 30 days
-            </p>
+            <div className="text-2xl font-bold">{contractAlerts?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">Within 30 days</p>
           </CardContent>
         </Card>
       </div>
@@ -113,24 +93,30 @@ export default function CEOAnalytics() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
-              Monthly Payroll Trend
+              Payroll Trend
             </CardTitle>
             <CardDescription>Total payroll expenses over time</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyPayroll}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-xs" />
-                  <YAxis className="text-xs" tickFormatter={(value) => `K${value/1000}k`} />
-                  <Tooltip 
-                    formatter={(value: number) => [`K ${value.toLocaleString()}`, 'Payroll']}
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                  />
-                  <Bar dataKey="amount" fill="hsl(145, 72%, 28%)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {payroll?.monthlyPayroll && payroll.monthlyPayroll.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={payroll.monthlyPayroll}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" />
+                    <YAxis className="text-xs" tickFormatter={(value) => `K${(value/1000).toFixed(0)}k`} />
+                    <Tooltip
+                      formatter={(value: number) => [`K ${value.toLocaleString()}`, 'Payroll']}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Bar dataKey="amount" fill="hsl(145, 72%, 28%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No payroll data yet. Approve timesheets to generate payslips.
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -139,53 +125,68 @@ export default function CEOAnalytics() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
-              Hours by Department
+              Summary
             </CardTitle>
-            <CardDescription>This month's work hours distribution</CardDescription>
+            <CardDescription>Key financial metrics</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={departmentHours} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" className="text-xs" />
-                  <YAxis dataKey="dept" type="category" className="text-xs" width={60} />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value} hours`, 'Hours']}
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                  />
-                  <Bar dataKey="hours" fill="hsl(145, 72%, 40%)" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-lg bg-primary/10">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Approved Hours</p>
+                  <p className="text-2xl font-bold">{(timesheetStats?.totalApprovedHours || 0).toFixed(1)}</p>
+                </div>
+                <Clock className="h-8 w-8 text-primary/40" />
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-lg bg-warning/10">
+                <div>
+                  <p className="text-sm text-muted-foreground">Pending Timesheets</p>
+                  <p className="text-2xl font-bold">{timesheetStats?.pendingCount || 0}</p>
+                </div>
+                <AlertTriangle className="h-8 w-8 text-warning/40" />
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/10">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Deductions</p>
+                  <p className="text-2xl font-bold">K {(payroll?.totalDeductions || 0).toLocaleString()}</p>
+                </div>
+                <TrendingDown className="h-8 w-8 text-destructive/40" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Bottom Row */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserCheck className="h-5 w-5 text-primary" />
-              Attendance Trend
+              Weekly Attendance Trend
             </CardTitle>
-            <CardDescription>Weekly attendance rate</CardDescription>
+            <CardDescription>Approval rate by week</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={attendanceData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="week" className="text-xs" />
-                  <YAxis className="text-xs" domain={[80, 100]} />
-                  <Tooltip 
-                    formatter={(value: number) => [`${value}%`, 'Attendance']}
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                  />
-                  <Line type="monotone" dataKey="rate" stroke="hsl(145, 72%, 28%)" strokeWidth={2} dot={{ fill: 'hsl(145, 72%, 28%)' }} />
-                </LineChart>
-              </ResponsiveContainer>
+              {timesheetStats?.weeklyAttendance && timesheetStats.weeklyAttendance.some(w => w.rate > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={timesheetStats.weeklyAttendance}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="week" className="text-xs" />
+                    <YAxis className="text-xs" domain={[0, 100]} />
+                    <Tooltip
+                      formatter={(value: number) => [`${value}%`, 'Attendance']}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Line type="monotone" dataKey="rate" stroke="hsl(145, 72%, 28%)" strokeWidth={2} dot={{ fill: 'hsl(145, 72%, 28%)' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  No attendance data yet
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -199,73 +200,66 @@ export default function CEOAnalytics() {
             <CardDescription>Permanent vs Temporary</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={employmentBreakdown}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {employmentBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => [`${value} workers`, '']}
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex justify-center gap-6 mt-4">
-              {employmentBreakdown.map((item) => (
-                <div key={item.name} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-sm">{item.name}: {item.value}</span>
+            {(workforce?.totalWorkforce || 0) > 0 ? (
+              <>
+                <div className="h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={employmentBreakdown} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                        {employmentBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => [`${value} workers`, '']}
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div className="flex justify-center gap-6">
+                  {employmentBreakdown.map((item) => (
+                    <div key={item.name} className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-sm">{item.name}: {item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
+                No approved workers yet
+              </div>
+            )}
           </CardContent>
         </Card>
+      </div>
 
+      {/* Contract Alerts */}
+      {contractAlerts && contractAlerts.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
               Contract Alerts
             </CardTitle>
-            <CardDescription>Upcoming expirations</CardDescription>
+            <CardDescription>Contracts expiring within 30 days</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-warning/10">
-              <div>
-                <p className="font-medium">Peter Manu</p>
-                <p className="text-sm text-muted-foreground">Surveyor</p>
+          <CardContent className="space-y-3">
+            {contractAlerts.map((contract: any) => (
+              <div key={contract.id} className="flex items-center justify-between p-3 rounded-lg bg-warning/10">
+                <div>
+                  <p className="font-medium">{contract.worker?.full_name || 'Unknown'}</p>
+                  <p className="text-sm text-muted-foreground">{contract.worker?.position || 'No position'}</p>
+                </div>
+                <Badge className="bg-warning text-warning-foreground">
+                  {new Date(contract.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </Badge>
               </div>
-              <Badge className="bg-warning text-warning-foreground">Feb 28</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
-              <div>
-                <p className="font-medium">James Kopi</p>
-                <p className="text-sm text-muted-foreground">Equipment Operator</p>
-              </div>
-              <Badge variant="secondary">Jun 30</Badge>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
-              <div>
-                <p className="font-medium">Lisa Kumul</p>
-                <p className="text-sm text-muted-foreground">Site Assistant</p>
-              </div>
-              <Badge variant="secondary">Jul 15</Badge>
-            </div>
+            ))}
           </CardContent>
         </Card>
-      </div>
+      )}
     </div>
   );
 }

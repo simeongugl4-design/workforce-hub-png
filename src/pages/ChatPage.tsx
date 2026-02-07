@@ -1,20 +1,25 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Send, ArrowLeft, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Send, ArrowLeft, Loader2, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useContacts, useConversation, useSendMessage } from "@/hooks/useMessages";
 
 export default function ChatPage() {
-  const { user } = useAuth();
+  const { user, primaryRole } = useAuth();
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [broadcastRole, setBroadcastRole] = useState<string>('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const canBroadcast = ['ceo', 'manager'].includes(primaryRole);
 
   const { data: contacts, isLoading: loadingContacts } = useContacts();
   const { data: messages, isLoading: loadingMessages } = useConversation(selectedContactId);
@@ -26,17 +31,33 @@ export default function ChatPage() {
     c.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !user || !selectedContactId) return;
+    if (!message.trim() || !user) return;
 
     try {
-      await sendMessage.mutateAsync({
-        senderId: user.id,
-        receiverId: selectedContactId,
-        content: message.trim(),
-      });
-      setMessage('');
+      if (broadcastRole) {
+        await sendMessage.mutateAsync({
+          senderId: user.id,
+          content: message.trim(),
+          isBroadcast: true,
+          broadcastToRole: broadcastRole as any,
+        });
+        setMessage('');
+        setBroadcastRole('');
+      } else if (selectedContactId) {
+        await sendMessage.mutateAsync({
+          senderId: user.id,
+          receiverId: selectedContactId,
+          content: message.trim(),
+        });
+        setMessage('');
+      }
     } catch (err) {
       console.error('Failed to send message:', err);
     }
@@ -57,7 +78,28 @@ export default function ChatPage() {
               <Input placeholder="Search contacts..." className="pl-9" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
           </CardHeader>
-          
+
+          {/* Broadcast option for managers/CEO */}
+          {canBroadcast && (
+            <div className="p-3 border-b">
+              <div className="flex items-center gap-2 mb-2">
+                <Megaphone size={16} className="text-primary" />
+                <span className="text-sm font-medium">Broadcast Message</span>
+              </div>
+              <Select value={broadcastRole} onValueChange={(v) => { setBroadcastRole(v); setSelectedContactId(null); }}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select role to broadcast to" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="worker">All Workers</SelectItem>
+                  <SelectItem value="supervisor">All Supervisors</SelectItem>
+                  <SelectItem value="manager">All Managers</SelectItem>
+                  <SelectItem value="accountant">All Accountants</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <ScrollArea className="flex-1">
             {loadingContacts ? (
               <div className="flex items-center justify-center py-8">
@@ -71,7 +113,7 @@ export default function ChatPage() {
               filteredContacts.map((contact: any) => (
                 <div
                   key={contact.id}
-                  onClick={() => setSelectedContactId(contact.id)}
+                  onClick={() => { setSelectedContactId(contact.id); setBroadcastRole(''); }}
                   className={cn(
                     "flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors border-b",
                     selectedContactId === contact.id && "bg-muted"
@@ -94,33 +136,51 @@ export default function ChatPage() {
         </div>
 
         {/* Chat Area */}
-        {selectedContactId ? (
+        {(selectedContactId || broadcastRole) ? (
           <div className="flex-1 flex flex-col">
             <div className="flex items-center gap-3 p-4 border-b">
-              <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedContactId(null)}>
+              <Button variant="ghost" size="icon" className="md:hidden" onClick={() => { setSelectedContactId(null); setBroadcastRole(''); }}>
                 <ArrowLeft size={20} />
               </Button>
-              <Avatar>
-                <AvatarImage src={selectedContact?.avatar_url} />
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  {selectedContact?.full_name?.split(' ').map((n: string) => n[0]).join('') || '?'}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium">{selectedContact?.full_name}</p>
-                <p className="text-xs text-muted-foreground">{selectedContact?.position}</p>
-              </div>
+              {broadcastRole ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Megaphone className="text-primary" size={20} />
+                  </div>
+                  <div>
+                    <p className="font-medium">Broadcast to {broadcastRole}s</p>
+                    <p className="text-xs text-muted-foreground">Message will be sent to all {broadcastRole}s</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Avatar>
+                    <AvatarImage src={selectedContact?.avatar_url} />
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {selectedContact?.full_name?.split(' ').map((n: string) => n[0]).join('') || '?'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{selectedContact?.full_name}</p>
+                    <p className="text-xs text-muted-foreground">{selectedContact?.position}</p>
+                  </div>
+                </>
+              )}
             </div>
 
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
-                {loadingMessages ? (
+                {!broadcastRole && loadingMessages ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                   </div>
-                ) : messages?.length === 0 ? (
+                ) : !broadcastRole && messages?.length === 0 ? (
                   <div className="text-center text-muted-foreground text-sm py-8">
                     No messages yet. Start a conversation!
+                  </div>
+                ) : broadcastRole ? (
+                  <div className="text-center text-muted-foreground text-sm py-8">
+                    Type your broadcast message below. It will be sent to all {broadcastRole}s.
                   </div>
                 ) : (
                   messages?.map((msg: any) => (
@@ -139,6 +199,12 @@ export default function ChatPage() {
                             : "bg-chat-received text-chat-received-foreground rounded-bl-md"
                         )}
                       >
+                        {msg.is_broadcast && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <Megaphone size={12} />
+                            <span className="text-xs font-medium">Broadcast</span>
+                          </div>
+                        )}
                         <p>{msg.content}</p>
                         <p className={cn(
                           "text-xs mt-1",
@@ -150,13 +216,19 @@ export default function ChatPage() {
                     </div>
                   ))
                 )}
+                <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
 
             <form onSubmit={handleSend} className="p-4 border-t">
               <div className="flex gap-2">
-                <Input placeholder="Type a message..." value={message} onChange={(e) => setMessage(e.target.value)} className="flex-1" />
-                <Button type="submit" size="icon" disabled={sendMessage.isPending}>
+                <Input
+                  placeholder={broadcastRole ? `Broadcast to all ${broadcastRole}s...` : "Type a message..."}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="flex-1"
+                />
+                <Button type="submit" size="icon" disabled={sendMessage.isPending || !message.trim()}>
                   <Send size={18} />
                 </Button>
               </div>
