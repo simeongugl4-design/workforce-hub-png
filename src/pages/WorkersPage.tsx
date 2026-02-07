@@ -8,12 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, UserPlus, Search, Mail, Phone, Loader2, CheckCircle, XCircle, UserCheck } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Users, Search, Loader2, CheckCircle, XCircle, UserCheck, Eye, Building } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAllProfiles, useUpdateProfile } from "@/hooks/useProfile";
+import { useAllProfiles, useBankDetails } from "@/hooks/useProfile";
 import { usePendingApprovals, useApproveAccount } from "@/hooks/useAccountApprovals";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -24,24 +24,47 @@ const getStatusBadge = (status: string) => {
   }
 };
 
+function WorkerBankDetails({ workerId }: { workerId: string }) {
+  const { data: bankDetails, isLoading } = useBankDetails(workerId);
+
+  if (isLoading) return <Loader2 className="h-4 w-4 animate-spin" />;
+  if (!bankDetails) return <span className="text-muted-foreground text-sm">No bank details</span>;
+
+  return (
+    <div className="grid gap-3 md:grid-cols-2 text-sm">
+      <div>
+        <p className="text-muted-foreground">Bank</p>
+        <p className="font-medium">{bankDetails.bank_name || '—'}</p>
+      </div>
+      <div>
+        <p className="text-muted-foreground">Branch</p>
+        <p className="font-medium">{bankDetails.branch || '—'}</p>
+      </div>
+      <div>
+        <p className="text-muted-foreground">Account Name</p>
+        <p className="font-medium">{bankDetails.account_name || '—'}</p>
+      </div>
+      <div>
+        <p className="text-muted-foreground">Account Number</p>
+        <p className="font-medium">{bankDetails.account_number || '—'}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkersPage() {
   const { user, primaryRole } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newWorker, setNewWorker] = useState({
-    email: '', phone: '+675 ', firstName: '', lastName: '',
-    position: '', employment_type: 'permanent' as 'permanent' | 'temporary',
-    hourly_rate: '15', supervisor_id: '',
-  });
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
 
   const { data: profiles, isLoading } = useAllProfiles();
   const { data: pendingApprovals } = usePendingApprovals();
   const approveAccount = useApproveAccount();
-  const updateProfile = useUpdateProfile();
 
   const isAdmin = ['ceo', 'manager'].includes(primaryRole);
+  const isSupervisor = primaryRole === 'supervisor';
 
   const filteredWorkers = profiles?.filter((w: any) => {
     const matchesSearch = w.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -60,107 +83,67 @@ export default function WorkersPage() {
     }
   };
 
-  const handleAddWorker = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // For admin: invite worker via Supabase auth
-    toast({ title: "Worker invitation sent", description: `${newWorker.firstName} ${newWorker.lastName} will receive an email invitation.` });
-    setIsAddDialogOpen(false);
-  };
+  const selectedWorker = profiles?.find((p: any) => p.id === selectedWorkerId);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold">Workers</h1>
-          <p className="text-muted-foreground">Manage your workforce</p>
+          <h1 className="font-display text-2xl md:text-3xl font-bold">
+            {isSupervisor ? 'My Team' : 'Workers'}
+          </h1>
+          <p className="text-muted-foreground">
+            {isSupervisor ? 'Manage your assigned workers' : 'Manage your workforce'}
+          </p>
         </div>
-        {isAdmin && (
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2"><UserPlus size={18} />Add Worker</Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Add New Worker</DialogTitle>
-                <DialogDescription>Worker will receive an email to set up their account.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddWorker} className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>First Name</Label>
-                    <Input value={newWorker.firstName} onChange={(e) => setNewWorker(p => ({ ...p, firstName: e.target.value }))} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Last Name</Label>
-                    <Input value={newWorker.lastName} onChange={(e) => setNewWorker(p => ({ ...p, lastName: e.target.value }))} required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>PNG Phone Number</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                    <Input value={newWorker.phone} onChange={(e) => setNewWorker(p => ({ ...p, phone: e.target.value }))} className="pl-10" required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                    <Input type="email" value={newWorker.email} onChange={(e) => setNewWorker(p => ({ ...p, email: e.target.value }))} className="pl-10" required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Position</Label>
-                  <Input value={newWorker.position} onChange={(e) => setNewWorker(p => ({ ...p, position: e.target.value }))} required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Employment Type</Label>
-                    <Select value={newWorker.employment_type} onValueChange={(v) => setNewWorker(p => ({ ...p, employment_type: v as any }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="permanent">Permanent</SelectItem>
-                        <SelectItem value="temporary">Temporary</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Hourly Rate (K)</Label>
-                    <Input type="number" value={newWorker.hourly_rate} onChange={(e) => setNewWorker(p => ({ ...p, hourly_rate: e.target.value }))} required />
-                  </div>
-                </div>
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} className="flex-1">Cancel</Button>
-                  <Button type="submit" className="flex-1">Add Worker</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
       </div>
 
       {/* Pending Approvals */}
-      {(isAdmin || primaryRole === 'supervisor') && pendingApprovals && pendingApprovals.length > 0 && (
+      {(isAdmin || isSupervisor) && pendingApprovals && pendingApprovals.length > 0 && (
         <Card className="border-warning/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserCheck className="h-5 w-5 text-warning" />
               Pending Account Approvals ({pendingApprovals.length})
             </CardTitle>
+            <CardDescription>Review and approve new worker registrations</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {pendingApprovals.map((approval: any) => (
-                <div key={approval.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
-                  <div>
-                    <p className="font-medium">{(approval.user as any)?.full_name || 'Unknown'}</p>
-                    <p className="text-sm text-muted-foreground">{(approval.user as any)?.email} • {(approval.user as any)?.phone}</p>
+                <div key={approval.id} className="flex items-center justify-between p-4 rounded-lg bg-muted">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-warning/20 text-warning">
+                        {(approval.user as any)?.full_name?.split(' ').map((n: string) => n[0]).join('') || '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{(approval.user as any)?.full_name || 'Unknown'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(approval.user as any)?.email} • {(approval.user as any)?.phone}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Requested: {new Date(approval.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" className="bg-success gap-1" onClick={() => handleApproval(approval.id, approval.user_id, 'approved')}>
+                    <Button
+                      size="sm"
+                      className="bg-success gap-1"
+                      onClick={() => handleApproval(approval.id, approval.user_id, 'approved')}
+                      disabled={approveAccount.isPending}
+                    >
                       <CheckCircle size={14} /> Approve
                     </Button>
-                    <Button size="sm" variant="destructive" className="gap-1" onClick={() => handleApproval(approval.id, approval.user_id, 'rejected')}>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="gap-1"
+                      onClick={() => handleApproval(approval.id, approval.user_id, 'rejected')}
+                      disabled={approveAccount.isPending}
+                    >
                       <XCircle size={14} /> Reject
                     </Button>
                   </div>
@@ -187,61 +170,146 @@ export default function WorkersPage() {
         </Select>
       </div>
 
-      {/* Workers Table */}
-      <Card>
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Rate</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Phone</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredWorkers.map((worker: any) => (
-                    <TableRow key={worker.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={worker.avatar_url} />
-                            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                              {worker.full_name?.split(' ').map((n: string) => n[0]).join('') || '?'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{worker.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{worker.email}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{worker.position || '—'}</TableCell>
-                      <TableCell><Badge variant="outline">{worker.employment_type}</Badge></TableCell>
-                      <TableCell>K {Number(worker.hourly_rate).toFixed(2)}</TableCell>
-                      <TableCell>{getStatusBadge(worker.account_status)}</TableCell>
-                      <TableCell className="text-muted-foreground">{worker.phone || '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                  {filteredWorkers.length === 0 && (
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Workers Table */}
+        <Card className={selectedWorkerId ? "lg:col-span-2" : "lg:col-span-3"}>
+          <CardContent className="pt-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No workers found</TableCell>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Rate</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredWorkers.map((worker: any) => (
+                      <TableRow key={worker.id} className={selectedWorkerId === worker.id ? 'bg-muted' : ''}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={worker.avatar_url} />
+                              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                                {worker.full_name?.split(' ').map((n: string) => n[0]).join('') || '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{worker.full_name}</p>
+                              <p className="text-xs text-muted-foreground">{worker.email}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{worker.position || '—'}</TableCell>
+                        <TableCell><Badge variant="outline">{worker.employment_type}</Badge></TableCell>
+                        <TableCell>K {Number(worker.hourly_rate || 0).toFixed(2)}</TableCell>
+                        <TableCell>{getStatusBadge(worker.account_status)}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setSelectedWorkerId(selectedWorkerId === worker.id ? null : worker.id)}
+                          >
+                            <Eye size={16} className="mr-1" /> View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredWorkers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No workers found</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Worker Detail Panel */}
+        {selectedWorkerId && selectedWorker && (
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={selectedWorker.avatar_url} />
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    {selectedWorker.full_name?.split(' ').map((n: string) => n[0]).join('') || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle className="text-lg">{selectedWorker.full_name}</CardTitle>
+                  <CardDescription>{selectedWorker.position || 'No position'}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="info" className="space-y-4">
+                <TabsList className="w-full">
+                  <TabsTrigger value="info" className="flex-1">Info</TabsTrigger>
+                  <TabsTrigger value="bank" className="flex-1">Bank</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="info" className="space-y-3">
+                  <div className="grid gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Email</p>
+                      <p className="font-medium">{selectedWorker.email || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Phone</p>
+                      <p className="font-medium">{selectedWorker.phone || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Department</p>
+                      <p className="font-medium">{selectedWorker.department || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Employment Type</p>
+                      <Badge variant="outline">{selectedWorker.employment_type}</Badge>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Hourly Rate</p>
+                      <p className="font-medium">K {Number(selectedWorker.hourly_rate || 0).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Location</p>
+                      <p className="font-medium">{selectedWorker.location || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Status</p>
+                      {getStatusBadge(selectedWorker.account_status)}
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Joined</p>
+                      <p className="font-medium">{new Date(selectedWorker.created_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="bank">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Building className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-sm">Bank Details</span>
+                    </div>
+                    <WorkerBankDetails workerId={selectedWorkerId} />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

@@ -8,9 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Wallet, TrendingUp, TrendingDown, DollarSign, PlusCircle, ArrowUpDown, Loader2, BarChart3 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Wallet, TrendingDown, DollarSign, PlusCircle, ArrowUpDown, Loader2, BarChart3, FileText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFinancialTransactions, useCreateTransaction, useFinancialSummary } from "@/hooks/useFinancials";
+import { usePayslips } from "@/hooks/usePayslips";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AccountsPage() {
@@ -29,11 +31,20 @@ export default function AccountsPage() {
 
   const { data: transactions, isLoading } = useFinancialTransactions();
   const { data: summary } = useFinancialSummary();
+  const { data: payslips } = usePayslips();
   const createTransaction = useCreateTransaction();
+
+  const paidPayslips = payslips?.filter((p: any) => p.status === 'paid') || [];
+  const generatedPayslips = payslips?.filter((p: any) => p.status === 'generated') || [];
 
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    if (!newTransaction.amount || Number(newTransaction.amount) <= 0) {
+      toast({ title: "Amount must be greater than 0", variant: "destructive" });
+      return;
+    }
 
     try {
       await createTransaction.mutateAsync({
@@ -101,7 +112,7 @@ export default function AccountsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Amount (K)</Label>
-                    <Input type="number" step="0.01" value={newTransaction.amount} onChange={(e) => setNewTransaction(p => ({ ...p, amount: e.target.value }))} required />
+                    <Input type="number" step="0.01" min="0" value={newTransaction.amount} onChange={(e) => setNewTransaction(p => ({ ...p, amount: e.target.value }))} required />
                   </div>
                   <div className="space-y-2">
                     <Label>Date</Label>
@@ -143,7 +154,7 @@ export default function AccountsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">K {(summary?.totalPayroll || 0).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">All time</p>
+            <p className="text-xs text-muted-foreground">{paidPayslips.length} payslips paid</p>
           </CardContent>
         </Card>
         <Card>
@@ -153,7 +164,7 @@ export default function AccountsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">K {(summary?.pendingPayroll || 0).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Awaiting payment</p>
+            <p className="text-xs text-muted-foreground">{generatedPayslips.length} payslips awaiting payment</p>
           </CardContent>
         </Card>
         <Card>
@@ -163,7 +174,7 @@ export default function AccountsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">K {(summary?.totalExpenses || 0).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">All expenses</p>
+            <p className="text-xs text-muted-foreground">All recorded expenses</p>
           </CardContent>
         </Card>
         <Card>
@@ -173,62 +184,102 @@ export default function AccountsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">K {(summary?.totalDeductions || 0).toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Total deductions</p>
+            <p className="text-xs text-muted-foreground">Total deductions applied</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Transactions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-primary" />
-            Transaction History
-          </CardTitle>
-          <CardDescription>All financial transactions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Recorded By</TableHead>
-                    <TableHead>Reference</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions?.map((tx: any) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{new Date(tx.transaction_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{getTypeBadge(tx.transaction_type)}</TableCell>
-                      <TableCell className="font-medium">K {Number(tx.amount).toLocaleString()}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{tx.description || '—'}</TableCell>
-                      <TableCell>{tx.category || '—'}</TableCell>
-                      <TableCell>{tx.recorder?.full_name || '—'}</TableCell>
-                      <TableCell className="text-muted-foreground">{tx.reference_number || '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                  {(!transactions || transactions.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No transactions recorded</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs for Transactions and Payroll Overview */}
+      <Tabs defaultValue="transactions" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll Summary</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transactions">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-primary" />
+                Transaction History
+              </CardTitle>
+              <CardDescription>All financial transactions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Recorded By</TableHead>
+                        <TableHead>Reference</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transactions?.map((tx: any) => (
+                        <TableRow key={tx.id}>
+                          <TableCell>{new Date(tx.transaction_date).toLocaleDateString()}</TableCell>
+                          <TableCell>{getTypeBadge(tx.transaction_type)}</TableCell>
+                          <TableCell className="font-medium">K {Number(tx.amount).toLocaleString()}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{tx.description || '—'}</TableCell>
+                          <TableCell>{tx.category || '—'}</TableCell>
+                          <TableCell>{tx.recorder?.full_name || '—'}</TableCell>
+                          <TableCell className="text-muted-foreground">{tx.reference_number || '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                      {(!transactions || transactions.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No transactions recorded</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payroll">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Payroll Overview
+              </CardTitle>
+              <CardDescription>Summary of all payslips by status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3 mb-6">
+                <div className="p-4 rounded-lg bg-muted text-center">
+                  <p className="text-sm text-muted-foreground">Generated (Unpaid)</p>
+                  <p className="text-2xl font-bold text-warning">{generatedPayslips.length}</p>
+                  <p className="text-sm">K {generatedPayslips.reduce((s: number, p: any) => s + Number(p.net_pay), 0).toLocaleString()}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted text-center">
+                  <p className="text-sm text-muted-foreground">Paid</p>
+                  <p className="text-2xl font-bold text-success">{paidPayslips.length}</p>
+                  <p className="text-sm">K {paidPayslips.reduce((s: number, p: any) => s + Number(p.net_pay), 0).toLocaleString()}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted text-center">
+                  <p className="text-sm text-muted-foreground">Total Payslips</p>
+                  <p className="text-2xl font-bold">{payslips?.length || 0}</p>
+                  <p className="text-sm">K {payslips?.reduce((s: number, p: any) => s + Number(p.net_pay), 0).toLocaleString() || '0'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

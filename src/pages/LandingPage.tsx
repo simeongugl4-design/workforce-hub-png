@@ -63,7 +63,7 @@ export default function LandingPage() {
             <Link to="/login">
               <Button variant="ghost">Sign In</Button>
             </Link>
-            <Link to="/login">
+            <Link to="/signup">
               <Button>Get Started</Button>
             </Link>
           </div>
@@ -91,9 +91,9 @@ export default function LandingPage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/login">
+              <Link to="/signup">
                 <Button size="lg" className="gap-2 px-8">
-                  Start Free Trial
+                  Create Account
                   <ArrowRight size={18} />
                 </Button>
               </Link>

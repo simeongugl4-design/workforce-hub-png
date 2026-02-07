@@ -1,17 +1,44 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Download, Eye, Calendar, DollarSign, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Calendar, DollarSign, Loader2, CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePayslips } from "@/hooks/usePayslips";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function PayslipsPage() {
-  const { primaryRole } = useAuth();
+  const { user, primaryRole } = useAuth();
   const { data: payslips, isLoading } = usePayslips();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const isAdmin = ['ceo', 'manager', 'accountant'].includes(primaryRole);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const latestPayslip = payslips?.[0];
+
+  const handleMarkPaid = async (payslipId: string) => {
+    try {
+      const { error } = await supabase
+        .from('payslips')
+        .update({ status: 'paid', paid_by: user?.id, paid_at: new Date().toISOString() })
+        .eq('id', payslipId);
+      if (error) throw error;
+      toast({ title: "Payslip marked as paid" });
+      queryClient.invalidateQueries({ queryKey: ['payslips'] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const filteredPayslips = payslips?.filter((p: any) => {
+    if (statusFilter === 'all') return true;
+    return p.status === statusFilter;
+  }) || [];
 
   if (isLoading) {
     return (
@@ -25,10 +52,10 @@ export default function PayslipsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl md:text-3xl font-bold">
-          {isAdmin ? "Payroll Management" : "Payslips"}
+          {isAdmin ? "Payroll Management" : "My Payslips"}
         </h1>
         <p className="text-muted-foreground">
-          {isAdmin ? "All worker payslips" : "Your automatically generated payslips"}
+          {isAdmin ? "Manage all worker payslips and payments" : "Your automatically generated payslips"}
         </p>
       </div>
 
@@ -40,9 +67,10 @@ export default function PayslipsPage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  Latest Payslip
+                  {isAdmin ? 'Latest Payslip' : 'Your Latest Payslip'}
                 </CardTitle>
                 <CardDescription>
+                  {isAdmin && latestPayslip.worker?.full_name ? `${latestPayslip.worker.full_name} • ` : ''}
                   {new Date(latestPayslip.period_start).toLocaleDateString()} - {new Date(latestPayslip.period_end).toLocaleDateString()}
                 </CardDescription>
               </div>
@@ -52,7 +80,7 @@ export default function PayslipsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-6 md:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-5">
               <div className="text-center p-4 rounded-lg bg-background">
                 <p className="text-sm text-muted-foreground">Hours</p>
                 <p className="text-2xl font-bold">{Number(latestPayslip.total_hours).toFixed(1)}</p>
@@ -81,11 +109,24 @@ export default function PayslipsPage() {
       {/* Payslip History */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            Payslip History
-          </CardTitle>
-          <CardDescription>All generated payslips</CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Payslip History
+              </CardTitle>
+              <CardDescription>All generated payslips</CardDescription>
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="generated">Generated</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -98,12 +139,13 @@ export default function PayslipsPage() {
                   <TableHead>Gross Pay</TableHead>
                   <TableHead>Net Pay</TableHead>
                   <TableHead>Status</TableHead>
+                  {isAdmin && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payslips?.map((payslip: any) => (
+                {filteredPayslips.map((payslip: any) => (
                   <TableRow key={payslip.id}>
-                    {isAdmin && <TableCell className="font-medium">{payslip.worker?.full_name}</TableCell>}
+                    {isAdmin && <TableCell className="font-medium">{payslip.worker?.full_name || '—'}</TableCell>}
                     <TableCell>
                       {new Date(payslip.period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(payslip.period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </TableCell>
@@ -115,11 +157,25 @@ export default function PayslipsPage() {
                         {payslip.status}
                       </Badge>
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        {payslip.status === 'generated' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-success gap-1"
+                            onClick={() => handleMarkPaid(payslip.id)}
+                          >
+                            <CheckCircle size={14} /> Mark Paid
+                          </Button>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
-                {(!payslips || payslips.length === 0) && (
+                {filteredPayslips.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isAdmin ? 7 : 5} className="text-center py-8 text-muted-foreground">
                       No payslips generated yet. Payslips are auto-generated when timesheets are approved.
                     </TableCell>
                   </TableRow>
@@ -134,14 +190,15 @@ export default function PayslipsPage() {
       <Card className="bg-muted/50">
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
               <DollarSign className="text-primary" size={20} />
             </div>
             <div>
               <h3 className="font-medium">Automatic Payslip Generation</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Payslips are automatically generated when timesheets are approved by supervisors.
-                Workers cannot edit payslips—all calculations are done by the system.
+                Workers cannot edit payslips — all calculations are based on approved hours × hourly rate.
+                {isAdmin && ' As an admin, you can mark generated payslips as paid after processing payment.'}
               </p>
             </div>
           </div>
