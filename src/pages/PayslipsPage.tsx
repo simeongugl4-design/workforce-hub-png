@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Calendar, DollarSign, Loader2, CheckCircle } from "lucide-react";
+import { FileText, Calendar, DollarSign, Loader2, CheckCircle, Download } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePayslips } from "@/hooks/usePayslips";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { generatePayslipPdf } from "@/utils/generatePayslipPdf";
 
 export default function PayslipsPage() {
   const { user, primaryRole } = useAuth();
@@ -32,6 +33,29 @@ export default function PayslipsPage() {
       queryClient.invalidateQueries({ queryKey: ['payslips'] });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDownloadPdf = (payslip: any) => {
+    try {
+      generatePayslipPdf({
+        workerName: payslip.worker?.full_name || 'Worker',
+        workerPosition: payslip.worker?.position || '',
+        workerEmail: payslip.worker?.email,
+        periodStart: payslip.period_start,
+        periodEnd: payslip.period_end,
+        totalHours: Number(payslip.total_hours),
+        hourlyRate: Number(payslip.hourly_rate),
+        grossPay: Number(payslip.gross_pay),
+        deductions: Number(payslip.deductions),
+        netPay: Number(payslip.net_pay),
+        status: payslip.status,
+        paidAt: payslip.paid_at,
+        notes: payslip.notes,
+      });
+      toast({ title: "Payslip PDF downloaded" });
+    } catch (err: any) {
+      toast({ title: "Error generating PDF", description: err.message, variant: "destructive" });
     }
   };
 
@@ -74,9 +98,14 @@ export default function PayslipsPage() {
                   {new Date(latestPayslip.period_start).toLocaleDateString()} - {new Date(latestPayslip.period_end).toLocaleDateString()}
                 </CardDescription>
               </div>
-              <Badge className={latestPayslip.status === 'paid' ? 'bg-success' : 'bg-warning text-warning-foreground'}>
-                {latestPayslip.status === 'paid' ? 'Paid' : latestPayslip.status === 'generated' ? 'Generated' : 'Draft'}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className={latestPayslip.status === 'paid' ? 'bg-success' : 'bg-warning text-warning-foreground'}>
+                  {latestPayslip.status === 'paid' ? 'Paid' : latestPayslip.status === 'generated' ? 'Generated' : 'Draft'}
+                </Badge>
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => handleDownloadPdf(latestPayslip)}>
+                  <Download size={14} /> PDF
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -139,7 +168,7 @@ export default function PayslipsPage() {
                   <TableHead>Gross Pay</TableHead>
                   <TableHead>Net Pay</TableHead>
                   <TableHead>Status</TableHead>
-                  {isAdmin && <TableHead>Actions</TableHead>}
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -157,25 +186,28 @@ export default function PayslipsPage() {
                         {payslip.status}
                       </Badge>
                     </TableCell>
-                    {isAdmin && (
-                      <TableCell>
-                        {payslip.status === 'generated' && (
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="gap-1" onClick={() => handleDownloadPdf(payslip)}>
+                          <Download size={14} /> PDF
+                        </Button>
+                        {isAdmin && payslip.status === 'generated' && (
                           <Button
                             size="sm"
                             variant="ghost"
                             className="text-success gap-1"
                             onClick={() => handleMarkPaid(payslip.id)}
                           >
-                            <CheckCircle size={14} /> Mark Paid
+                            <CheckCircle size={14} /> Paid
                           </Button>
                         )}
-                      </TableCell>
-                    )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filteredPayslips.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 7 : 5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isAdmin ? 7 : 6} className="text-center py-8 text-muted-foreground">
                       No payslips generated yet. Payslips are auto-generated when timesheets are approved.
                     </TableCell>
                   </TableRow>

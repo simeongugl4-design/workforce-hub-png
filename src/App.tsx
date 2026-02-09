@@ -16,6 +16,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import WorkersPage from "@/pages/WorkersPage";
 import CEOAnalytics from "@/pages/CEOAnalytics";
 import AccountsPage from "@/pages/AccountsPage";
+import ContractsPage from "@/pages/ContractsPage";
 
 // Layout & Auth
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -61,6 +62,11 @@ const App = () => (
               <Route path="/accounts" element={
                 <ProtectedRoute allowedRoles={['ceo', 'manager', 'accountant']}>
                   <AccountsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/contracts" element={
+                <ProtectedRoute allowedRoles={['ceo', 'manager', 'supervisor']}>
+                  <ContractsPage />
                 </ProtectedRoute>
               } />
               <Route path="/team" element={

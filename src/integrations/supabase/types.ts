@@ -512,6 +512,72 @@ export type Database = {
         }
         Relationships: []
       }
+      work_summaries: {
+        Row: {
+          challenges: string | null
+          created_at: string
+          id: string
+          next_period_goals: string | null
+          period_end: string
+          period_start: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_at: string | null
+          summary: string
+          tasks_completed: string | null
+          updated_at: string
+          worker_id: string
+        }
+        Insert: {
+          challenges?: string | null
+          created_at?: string
+          id?: string
+          next_period_goals?: string | null
+          period_end: string
+          period_start: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          summary: string
+          tasks_completed?: string | null
+          updated_at?: string
+          worker_id: string
+        }
+        Update: {
+          challenges?: string | null
+          created_at?: string
+          id?: string
+          next_period_goals?: string | null
+          period_end?: string
+          period_start?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          summary?: string
+          tasks_completed?: string | null
+          updated_at?: string
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_summaries_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_summaries_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

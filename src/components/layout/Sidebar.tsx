@@ -9,7 +9,8 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Wallet
+  Wallet,
+  FileSignature
 } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ const menuItems: Record<UserRole, { icon: React.ReactNode; label: string; path: 
     { icon: <Users size={20} />, label: "My Team", path: "/team" },
     { icon: <Clock size={20} />, label: "Timesheets", path: "/timesheet" },
     { icon: <FileText size={20} />, label: "Payslips", path: "/payslips" },
+    { icon: <FileSignature size={20} />, label: "Contracts", path: "/contracts" },
     { icon: <MessageCircle size={20} />, label: "Messages", path: "/chat" },
     { icon: <User size={20} />, label: "My Profile", path: "/profile" },
   ],
@@ -43,6 +45,7 @@ const menuItems: Record<UserRole, { icon: React.ReactNode; label: string; path: 
     { icon: <Users size={20} />, label: "Workers", path: "/workers" },
     { icon: <Clock size={20} />, label: "Timesheets", path: "/timesheet" },
     { icon: <FileText size={20} />, label: "Payslips", path: "/payslips" },
+    { icon: <FileSignature size={20} />, label: "Contracts", path: "/contracts" },
     { icon: <Wallet size={20} />, label: "Accounts", path: "/accounts" },
     { icon: <MessageCircle size={20} />, label: "Messages", path: "/chat" },
     { icon: <BarChart3 size={20} />, label: "Reports", path: "/reports" },
@@ -53,6 +56,7 @@ const menuItems: Record<UserRole, { icon: React.ReactNode; label: string; path: 
     { icon: <BarChart3 size={20} />, label: "Analytics", path: "/analytics" },
     { icon: <Users size={20} />, label: "All Workers", path: "/workers" },
     { icon: <FileText size={20} />, label: "Payroll", path: "/payroll" },
+    { icon: <FileSignature size={20} />, label: "Contracts", path: "/contracts" },
     { icon: <Wallet size={20} />, label: "Accounts", path: "/accounts" },
     { icon: <MessageCircle size={20} />, label: "Broadcast", path: "/broadcast" },
     { icon: <Settings size={20} />, label: "Settings", path: "/settings" },
