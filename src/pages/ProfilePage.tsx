@@ -6,19 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Mail, Phone, MapPin, Calendar, Briefcase, Edit, Building, Loader2, Save, X } from "lucide-react";
+import { User, Mail, Phone, MapPin, Calendar, Briefcase, Edit, Building, Loader2, Save, X, Shield, Users, BarChart3, ClipboardList } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile, useUpdateProfile, useBankDetails, useUpsertBankDetails } from "@/hooks/useProfile";
+import { useTimesheets } from "@/hooks/useTimesheets";
+import { usePayslips } from "@/hooks/usePayslips";
+import { useContracts } from "@/hooks/useContracts";
 import { useToast } from "@/hooks/use-toast";
+import { WorkSummarySection } from "@/components/workers/WorkSummarySection";
 
 export default function ProfilePage() {
-  const { user, primaryRole } = useAuth();
+  const { user, primaryRole, roles } = useAuth();
   const { data: profile, isLoading } = useProfile();
   const { data: bankDetails } = useBankDetails();
+  const { data: timesheets } = useTimesheets();
+  const { data: payslips } = usePayslips();
+  const { data: contracts } = useContracts(user?.id);
   const updateProfile = useUpdateProfile();
   const upsertBank = useUpsertBankDetails();
   const { toast } = useToast();
-  
+
   const [editingProfile, setEditingProfile] = useState(false);
   const [editingBank, setEditingBank] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -45,6 +52,14 @@ export default function ProfilePage() {
   }
 
   const initials = profile.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '?';
+
+  const totalHours = timesheets?.filter((t: any) => t.status === 'approved')
+    .reduce((sum: number, t: any) => sum + Number(t.total_hours || 0), 0) || 0;
+
+  const totalEarned = payslips?.filter((p: any) => p.status === 'paid')
+    .reduce((sum: number, p: any) => sum + Number(p.net_pay || 0), 0) || 0;
+
+  const activeContracts = contracts?.filter((c: any) => c.is_active && new Date(c.end_date) >= new Date()).length || 0;
 
   const handleEditProfile = () => {
     setProfileForm({
@@ -92,6 +107,27 @@ export default function ProfilePage() {
     }
   };
 
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'ceo': return 'bg-accent text-accent-foreground';
+      case 'manager': return 'bg-primary text-primary-foreground';
+      case 'supervisor': return 'bg-warning text-warning-foreground';
+      case 'accountant': return 'bg-success text-success-foreground';
+      default: return '';
+    }
+  };
+
+  const getRoleDescription = () => {
+    switch (primaryRole) {
+      case 'ceo': return 'Full organizational visibility and management';
+      case 'manager': return 'Operational management, hiring, and pay rates';
+      case 'supervisor': return 'Team management, timesheets, and worker oversight';
+      case 'accountant': return 'Financial oversight, payroll, and transaction management';
+      case 'worker': return 'Personal timesheets, payslips, and profile management';
+      default: return '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Profile Header */}
@@ -107,7 +143,15 @@ export default function ProfilePage() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <h1 className="font-display text-2xl md:text-3xl font-bold">{profile.full_name}</h1>
-                  <p className="text-muted-foreground">{profile.position || 'Employee'} • <span className="capitalize">{primaryRole}</span></p>
+                  <p className="text-muted-foreground">{profile.position || 'Employee'}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Shield size={16} className="text-primary" />
+                    <Badge className={getRoleBadgeColor(primaryRole) + ' capitalize'}>{primaryRole}</Badge>
+                    {roles.length > 1 && roles.filter(r => r !== primaryRole).map(r => (
+                      <Badge key={r} variant="outline" className="capitalize">{r}</Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{getRoleDescription()}</p>
                 </div>
                 <Badge className={profile.account_status === 'approved' ? 'bg-success' : 'bg-warning text-warning-foreground'}>
                   {profile.account_status}
@@ -118,11 +162,55 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Role-specific Stats */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <Briefcase className="h-8 w-8 mx-auto mb-2 text-primary" />
+            <p className="text-2xl font-bold capitalize">{primaryRole}</p>
+            <p className="text-sm text-muted-foreground">Role</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <BarChart3 className="h-8 w-8 mx-auto mb-2 text-primary" />
+            <p className="text-2xl font-bold">{totalHours.toFixed(0)}</p>
+            <p className="text-sm text-muted-foreground">Total Hours</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <Building className="h-8 w-8 mx-auto mb-2 text-primary" />
+            <p className="text-2xl font-bold">K {totalEarned.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground">Total Earned</p>
+          </CardContent>
+        </Card>
+        {profile.employment_type === 'temporary' && (
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <ClipboardList className="h-8 w-8 mx-auto mb-2 text-primary" />
+              <p className="text-2xl font-bold">{activeContracts}</p>
+              <p className="text-sm text-muted-foreground">Active Contracts</p>
+            </CardContent>
+          </Card>
+        )}
+        {profile.employment_type === 'permanent' && (
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <Calendar className="h-8 w-8 mx-auto mb-2 text-primary" />
+              <p className="text-2xl font-bold">{payslips?.length || 0}</p>
+              <p className="text-sm text-muted-foreground">Total Payslips</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       <Tabs defaultValue="info" className="space-y-4">
         <TabsList>
           <TabsTrigger value="info">Personal Info</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="bank">Bank Details</TabsTrigger>
+          {primaryRole === 'worker' && <TabsTrigger value="summaries">Work Summaries</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="info">
@@ -248,7 +336,11 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Role</p>
-                  <Badge variant="outline" className="mt-1 capitalize">{primaryRole}</Badge>
+                  <div className="flex items-center gap-2 mt-1">
+                    {roles.map(r => (
+                      <Badge key={r} variant="outline" className="capitalize">{r}</Badge>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
@@ -257,6 +349,32 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Payslip History in Employment tab */}
+          {payslips && payslips.length > 0 && (
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="text-base">Recent Payslips</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {payslips.slice(0, 5).map((p: any) => (
+                    <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
+                      <span className="text-sm">
+                        {new Date(p.period_start).toLocaleDateString()} – {new Date(p.period_end).toLocaleDateString()}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">K {Number(p.net_pay).toLocaleString()}</span>
+                        <Badge variant={p.status === 'paid' ? 'default' : 'secondary'} className={p.status === 'paid' ? 'bg-success' : ''}>
+                          {p.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="bank">
@@ -352,6 +470,12 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {primaryRole === 'worker' && (
+          <TabsContent value="summaries">
+            <WorkSummarySection showForm />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
