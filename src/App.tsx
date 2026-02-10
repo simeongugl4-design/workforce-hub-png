@@ -8,7 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LandingPage from "@/pages/LandingPage";
 import LoginPage from "@/pages/LoginPage";
 import SignupPage from "@/pages/SignupPage";
-import WorkerDashboard from "@/pages/dashboard/WorkerDashboard";
+import DashboardRouter from "@/pages/dashboard/DashboardRouter";
 import TimesheetPage from "@/pages/TimesheetPage";
 import PayslipsPage from "@/pages/PayslipsPage";
 import ChatPage from "@/pages/ChatPage";
@@ -44,7 +44,7 @@ const App = () => (
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route path="/dashboard" element={<WorkerDashboard />} />
+              <Route path="/dashboard" element={<DashboardRouter />} />
               <Route path="/timesheet" element={<TimesheetPage />} />
               <Route path="/payslips" element={<PayslipsPage />} />
               <Route path="/chat" element={<ChatPage />} />
